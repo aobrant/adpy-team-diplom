@@ -12,20 +12,35 @@ create_tables(engine)
 Session = sessionmaker(bind=engine)
 session = Session()
 
-with open('fixtures/tests_data.json', 'r') as fd:
-    data = json.load(fd)
+user1 = User(name="Влад", age=26, gender="мужской", city="Москва")
+user2 = User(name="Маша", age=22, gender="женский", city="Санкт-Петербург")
+stranger1 = Stranger(name="Денис", age=25, gender="мужской", city="Санкт-Петербург")
+stranger2 = Stranger(name="Наташа", age=21, gender="женский", city="Москва")
 
-for record in data:
-    model = {
-        'user_stranger': User_stranger,
-        'user': User,
-        'stranger': Stranger,
-    }[record.get('model')]
-    session.add(model(id=record.get('pk'), **record.get('fields')))
-
+session.add_all([user1, user2, stranger1, stranger2])
 session.commit()
 
 for c in session.query(User).all():
     print(c)
+
+for c in session.query(Stranger).all():
+    print(c)
+
+# with open('fixtures/tests_data.json', 'r') as fd:
+#     data = json.load(fd)
+#
+# for record in data:
+#     model = {
+#         'user_stranger': User_stranger,
+#         'user': User,
+#         'stranger': Stranger,
+#     }[record.get('model')]
+#     session.add(model(id=record.get('pk'), **record.get('fields')))
+#
+# session.commit()
+#
+#
+# for c in session.query(User).all():
+#     print(c)
 
 session.close()

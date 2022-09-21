@@ -13,9 +13,6 @@ class User_stranger(Base):
     users = relationship("User", back_populates="user_stranger1")
     strangers = relationship("Stranger", back_populates="user_stranger2")
 
-    def __str__(self):
-        return f'{self.id}: ({self.user_id}, {self.stranger_id})'
-
 class User(Base):
     __tablename__ = "user"
 
@@ -28,7 +25,7 @@ class User(Base):
     user_stranger1 = relationship("User_stranger", back_populates="users")
 
     def __str__(self):
-        return f'{self.id}: ({self.name}, {self.age}, {self.gender}, {self.city})'
+        return f'Номер ID - {self.id}, Имя - {self.name}, Возраст - {self.age}, Пол - {self.gender}, Город - {self.city}'
 
 class Stranger(Base):
     __tablename__ = "stranger"
@@ -42,7 +39,7 @@ class Stranger(Base):
     user_stranger2 = relationship("User_stranger", back_populates="strangers")
 
     def __str__(self):
-        return f'{self.id}: ({self.name}, {self.age}, {self.gender}, {self.city})'
+        return f'Номер ID - {self.id}, Имя - {self.name}, Возраст - {self.age}, Пол - {self.gender}, Город - {self.city}'
 
 def create_tables(engine):
     Base.metadata.drop_all(engine)
