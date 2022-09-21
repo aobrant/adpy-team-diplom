@@ -1,0 +1,14 @@
+[
+  {"model": "user", "pk": 1, "fields": {"name": "Иван", "age": 22, "gender": "мужской", "city": "Москва"}},
+  {"model": "user", "pk": 2, "fields": {"name": "Маша", "age": 21, "gender": "женский", "city": "Видное"}},
+  {"model": "user", "pk": 3, "fields": {"name": "Наташа", "age": 22, "gender": "женский", "city": "Санкт-Петербург"}},
+  {"model": "user", "pk": 4, "fields": {"name": "Влад", "age": 27, "gender": "мужской", "city": "Химки"}},
+  {"model": "stranger", "pk": 1, "fields": {"name": "Катя", "age": 19, "gender": "женский", "city": "Москва"}},
+  {"model": "stranger", "pk": 2, "fields": {"name": "Павел", "age": 23, "gender": "мужской", "city": "Видное"}},
+  {"model": "stranger", "pk": 3, "fields": {"name": "Денис", "age": 25, "gender": "мужской", "city": "Санкт-Петербург"}},
+  {"model": "stranger", "pk": 4, "fields": {"name": "Лена", "age": 24, "gender": "женский", "city": "Химки"}},
+  {"model": "user_stranger", "pk": 1, "fields": {"user_id": 1, "stranger_id": 1}},
+  {"model": "user_stranger", "pk": 2, "fields": {"user_id": 2, "stranger_id": 2}},
+  {"model": "user_stranger", "pk": 3, "fields": {"user_id": 3, "stranger_id": 3}},
+  {"model": "user_stranger", "pk": 4, "fields": {"user_id": 4, "stranger_id": 4}}
+]
