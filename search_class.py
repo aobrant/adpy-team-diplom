@@ -3,13 +3,6 @@ import configparser
 from pprint import pprint
 
 
-#def find_big_photo(photos):
-    #for photo in photos:
-        #if photo['type'] == 'w':
-            #return photo['type'], photo['url']
-    #return photos[-1]['type'], photos[-1]['url']
-
-
 class VkApi:
     def __init__(self, token: str, user_token=None):
         self.params = {
@@ -44,7 +37,10 @@ class VkApi:
     def users_search(self, **kwargs):
 
         vk_url = 'https://api.vk.com/method/users.search'
-        params = kwargs | {'has_photo' : 1}
+        params = kwargs | {'has_photo' : 1,
+                           'count' : 1000,
+                           'status' : 6 #  в активном поиске
+                           }
         req = requests.get(vk_url, self.user_params | params)
         # print(req)
         # pprint(req.json())
