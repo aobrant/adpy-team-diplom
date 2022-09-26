@@ -52,8 +52,9 @@ for event in longpoll.listen():
                 n = int(request)
                 write_msg(event.user_id,
                           f"{res[n]['first_name']} {res[n]['last_name']}\nhttps://vk.com/id{res[n]['id']}",
-                          {searcher.find_3_photos(res[n]['id'])})
+                          searcher.find_3_photos(res[n]['id']))
             elif 'поиск' in request:
-                write_msg(event.user_id, f"{res[0]['first_name']} {res[0]['last_name']}\nhttps://vk.com/id{res[0]['id']}", ','.join(res[0]['photo_urls']))
+                write_msg(event.user_id, f"{res[0]['first_name']} {res[0]['last_name']}\nhttps://vk.com/id{res[0]['id']}",
+                          searcher.find_3_photos(res[0]['id']))
             else:
                 write_msg(event.user_id, "Не поняла вашего ответа...Напиши номер пары числом, начни с 0, как программист")
