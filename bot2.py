@@ -1,11 +1,24 @@
 from random import randrange
 import configparser
 import vk_api
+
 from vk_api.keyboard import VkKeyboard,VkKeyboardColor
 from vk_api.longpoll import VkLongPoll, VkEventType
 from search_class import VkApi
 from pprint import pprint
 
+import sqlalchemy
+from sqlalchemy.orm import sessionmaker
+
+from bd_models import create_tables, User_stranger, User, Stranger
+
+DSN = 'postgresql://postgres:postgres@localhost:5432/netology_db'
+engine = sqlalchemy.create_engine(DSN)
+
+create_tables(engine)
+
+Session = sessionmaker(bind=engine)
+session = Session()
 
 
 config = configparser.ConfigParser()
@@ -28,15 +41,33 @@ keyboard.add_button('Привет', color=VkKeyboardColor.NEGATIVE)
 
 for event in longpoll.listen():
     if event.type == VkEventType.MESSAGE_NEW:
-        user_info = searcher.get_info_by_id(event.user_id)
-        bdate = user_info['bdate']
-        year = int(bdate.split('.')[2])
-        #print(f'year = {year}')
-        city_id = user_info['city']['id']
-        #print(f'city_id = {city_id}')
-        sex = user_info['sex']
-        #print(f'sex = {sex}')
-        sex = 1 if sex == 2 else 2
+        id = event.user_id
+        #q = session.query(User.name, User.year, User.sex, User.city, User.city_id).filter(User.id == id).one()
+        q = session.query(User).get(id)
+        if q:
+            name = q.name
+            year = q.year,
+            sex = q.sex
+            city = q.city
+            city_id = q.city_id
+        else:
+            user_info = searcher.get_info_by_id(id)
+            name = ' '.join((user_info['first_name'], user_info['last_name']))
+            bdate = user_info['bdate']
+            year = int(bdate.split('.')[2])
+            # print(f'year = {year}')
+            print(user_info['city'])
+            city = user_info['city']['title']
+            city_id = user_info['city']['id']
+            # print(f'city_id = {city_id}')
+            sex = user_info['sex']
+            # print(f'sex = {sex}')
+            sex = 1 if sex == 2 else 2
+            user = User(id=id, name=name, year=year, sex=sex, city=city, city_id=city_id)
+            session.add_all([user])
+            session.commit()
+
+
         res = searcher.search(city=city_id, sex=1, birth_year=year)
         #pprint(res)
 
