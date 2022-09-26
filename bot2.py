@@ -39,7 +39,9 @@ keyboard = VkKeyboard(one_time=True)
 keyboard.add_button('Привет', color=VkKeyboardColor.NEGATIVE)
 
 counter = 0
+
 for event in longpoll.listen():
+
     if event.type == VkEventType.MESSAGE_NEW:
         id = event.user_id
         q = session.query(User).get(id)
@@ -82,12 +84,15 @@ for event in longpoll.listen():
             user = User(id=id, name=name, year=year, sex=sex, city=city, city_id=city_id)
         #pprint(res)
 
+        def get_name(uid: int) -> str:
+            data = vk.method("users.get", {"user_ids": uid})[0]
+            return f"{data['first_name']}"
+
         if event.to_me:
             request = event.text.lower()
             print(request)
-
             if request == "привет":
-                write_msg(event.user_id, f"Хай, {event.user_id}")
+                write_msg(event.user_id, f"Привет, {get_name(event.user_id)}, меня зовут Лаура! Я - бот для знакомств, давай начнем поиск подходящей пары")
             elif request == "пока":
                 write_msg(event.user_id, "Пока((")
             elif request.isdigit():
@@ -97,7 +102,6 @@ for event in longpoll.listen():
                           searcher.find_3_photos(res[n]['id']))
             elif 'поиск' in request:
                 counter += 1
-                print(counter)
                 write_msg(event.user_id, f"{res[counter]['first_name']} {res[counter]['last_name']}\nhttps://vk.com/id{res[counter]['id']}",
                           searcher.find_3_photos(res[counter]['id']))
             else:
