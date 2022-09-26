@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 
 from bd_models import create_tables, User_stranger, User, Stranger
 
-DSN = 'postgresql://postgres:postgres@localhost:5432/netology_db'
+DSN = 'postgresql://postgres: @localhost:5432/netology_db'
 engine = sqlalchemy.create_engine(DSN)
 
 create_tables(engine)
@@ -38,17 +38,17 @@ def write_msg(user_id, message, attachment=None, keyboard=None):
 keyboard = VkKeyboard(one_time=True)
 keyboard.add_button('Привет', color=VkKeyboardColor.NEGATIVE)
 
-
+counter = 0
 for event in longpoll.listen():
     if event.type == VkEventType.MESSAGE_NEW:
         id = event.user_id
         #q = session.query(User.name, User.year, User.sex, User.city, User.city_id).filter(User.id == id).one()
         q = session.query(User).get(id)
         if q:
-            name = q.name
+            name = q.name,
             year = q.year,
-            sex = q.sex
-            city = q.city
+            sex = q.sex,
+            city = q.city,
             city_id = q.city_id
         else:
             user_info = searcher.get_info_by_id(id)
@@ -72,7 +72,7 @@ for event in longpoll.listen():
         #pprint(res)
 
         if event.to_me:
-            request = event.text
+            request = event.text.lower()
             print(request)
 
             if request == "привет":
@@ -85,7 +85,9 @@ for event in longpoll.listen():
                           f"{res[n]['first_name']} {res[n]['last_name']}\nhttps://vk.com/id{res[n]['id']}",
                           searcher.find_3_photos(res[n]['id']))
             elif 'поиск' in request:
-                write_msg(event.user_id, f"{res[0]['first_name']} {res[0]['last_name']}\nhttps://vk.com/id{res[0]['id']}",
-                          searcher.find_3_photos(res[0]['id']))
+                counter += 1
+                print(counter)
+                write_msg(event.user_id, f"{res[counter]['first_name']} {res[counter]['last_name']}\nhttps://vk.com/id{res[counter]['id']}",
+                          searcher.find_3_photos(res[counter]['id']))
             else:
                 write_msg(event.user_id, "Не поняла вашего ответа...Напиши номер пары числом, начни с 0, как программист")
