@@ -42,7 +42,6 @@ keyboard.add_button('Привет', color=VkKeyboardColor.NEGATIVE)
 for event in longpoll.listen():
     if event.type == VkEventType.MESSAGE_NEW:
         id = event.user_id
-        #q = session.query(User.name, User.year, User.sex, User.city, User.city_id).filter(User.id == id).one()
         q = session.query(User).get(id)
         if q:
             name = q.name
@@ -55,13 +54,9 @@ for event in longpoll.listen():
             name = ' '.join((user_info['first_name'], user_info['last_name']))
             bdate = user_info['bdate']
             year = int(bdate.split('.')[2])
-            # print(f'year = {year}')
-            print(user_info['city'])
             city = user_info['city']['title']
             city_id = user_info['city']['id']
-            # print(f'city_id = {city_id}')
             sex = user_info['sex']
-            # print(f'sex = {sex}')
             sex = 1 if sex == 2 else 2
             user = User(id=id, name=name, year=year, sex=sex, city=city, city_id=city_id)
             session.add_all([user])
@@ -69,6 +64,22 @@ for event in longpoll.listen():
 
 
         res = searcher.search(city=city_id, sex=1, birth_year=year)
+        strangers = []
+        for user_info in res:
+            stranger_id = user_info['id']
+            q = session.query(Stranger).get(stranger_id)
+            if q:
+                pass
+            else:
+                stranger = Stranger(id=user_info['id'], name=' '.join((user_info['first_name'], user_info['last_name'])),
+                                  year=year, sex=sex, city=city, city_id=city_id)
+                # year, sex, city, city_id - не нужны в базе
+                strangers.append(stranger)
+
+        session.add_all(strangers)
+        session.commit()
+        for person in res:
+            user = User(id=id, name=name, year=year, sex=sex, city=city, city_id=city_id)
         #pprint(res)
 
         if event.to_me:
