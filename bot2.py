@@ -1,8 +1,7 @@
 from random import randrange
 import configparser
 import vk_api
-
-from vk_api.keyboard import VkKeyboard,VkKeyboardColor
+from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from vk_api.longpoll import VkLongPoll, VkEventType
 from search_class import VkApi
 from pprint import pprint
@@ -35,8 +34,10 @@ def write_msg(user_id, message, attachment=None, keyboard=None):
     vk.method('messages.send', {'user_id': user_id, 'message': message,  'random_id': randrange(10 ** 7),
                                 'attachment': attachment, 'keyboard': keyboard})
 
-keyboard = VkKeyboard(one_time=True)
-keyboard.add_button('Привет', color=VkKeyboardColor.NEGATIVE)
+
+keyboard = VkKeyboard(one_time=False)
+keyboard.add_button('Поиск', color=VkKeyboardColor.POSITIVE)
+keyboard.add_button('Избранное', color=VkKeyboardColor.PRIMARY)
 
 for event in longpoll.listen():
 
@@ -46,89 +47,118 @@ for event in longpoll.listen():
             data = vk.method("users.get", {"user_ids": uid})[0]
             return f"{data['first_name']}"
 
+        id = event.user_id
+
         if event.to_me:
             request = event.text.lower()
             print(request)
             if request == "привет":
-                write_msg(event.user_id, f"Привет, {get_name(event.user_id)}, меня зовут Лаура! Я - бот для знакомств, давай начнем поиск подходящей пары. Для поиска напиши ПОИСК")
+                inline_keyboard = VkKeyboard(one_time=False, inline=True)
+                inline_keyboard.add_button(label="Like")
+                write_msg(event.user_id,
+                          f"Привет, {get_name(event.user_id)}, меня зовут Лаура! Я - бот для знакомств, давай начнем поиск подходящей пары. Для поиска напиши ПОИСК",
+                          keyboard=keyboard.get_keyboard())
             elif request == "пока":
                 write_msg(event.user_id, "Пока((")
             elif 'поиск' in request:
-                id = event.user_id
-                q = session.query(User).get(id)
-                if q:
-                    name = q.name,
-                    year = q.year,
-                    sex = q.sex,
-                    city = q.city,
-                    city_id = q.city_id
-                else:
-                    user_info = searcher.get_info_by_id(id)
-                    #name = ' '.join((user_info['first_name'], user_info['last_name']))
-                    name = ' '.join((user_info.get('first_name', ''), user_info.get('last_name', '')))
-                    bdate = user_info['bdate']
-                    year = int(bdate.split('.')[2])
-                    city = user_info['city']['title']
-                    city_id = user_info['city']['id']
-                    sex = user_info['sex']
-                    sex = 1 if sex == 2 else 2
-                    user = User(id=id, name=name, year=year, sex=sex, city=city, city_id=city_id)
-                    session.add_all([user])
+                q = session.query(Stranger).join(User_stranger, Stranger.id == User_stranger.stranger_id).filter(
+                    User_stranger.user_id == id,
+                    User_stranger.status == 'W'
+                ).limit(1).all()
+                if not q:
+                    print('Запускаем новый поиск')
+                    q2 = session.query(User).get(id)
+                    if q2:
+                        name = q2.name,
+                        year = q2.year,
+                        sex = q2.sex,
+                        city = q2.city,
+                        city_id = q2.city_id
+                    else:
+                        user_info = searcher.get_info_by_id(id)
+                        # name = ' '.join((user_info['first_name'], user_info['last_name']))
+                        name = ' '.join((user_info.get('first_name', ''), user_info.get('last_name', '')))
+                        bdate = user_info['bdate']
+                        year = int(bdate.split('.')[2])
+                        city = user_info['city']['title']
+                        city_id = user_info['city']['id']
+                        sex = user_info['sex']
+                        sex = 1 if sex == 2 else 2
+                        user = User(id=id, name=name, year=year, sex=sex, city=city, city_id=city_id)
+                        session.add_all([user])
+                        session.commit()
+
+                    res = searcher.search(city=city_id, sex=1, birth_year=year)
+                    strangers, user_strangers = [], []
+                    for user_info in res:
+                        stranger_id = user_info['id']
+                        q = session.query(Stranger).get(stranger_id)
+                        if q:
+                            pass
+                        else:
+                            stranger = Stranger(id=stranger_id,
+                                                name=' '.join((user_info['first_name'], user_info['last_name'])),
+                                                year=year, sex=sex, city=city, city_id=city_id)
+                            # year, sex, city, city_id - не нужны в базе
+                            strangers.append(stranger)
+                            user_stranger = User_stranger(user_id=id, stranger_id=stranger_id, status='W')
+                            user_strangers.append(user_stranger)
+
+                    session.add_all(strangers)
+                    session.add_all(user_strangers)
+                    session.commit()
+                    q = session.query(Stranger).join(User_stranger, Stranger.id == User_stranger.stranger_id).filter(
+                        User_stranger.user_id == id,
+                        User_stranger.status == 'W'
+                    ).limit(1).all()
+                for el in q:
+                    name = el.name
+                    stranger_id = el.id
+                    inline_keyboard = VkKeyboard(one_time=False, inline=True)
+                    inline_keyboard.add_button(label="Like " + str(stranger_id))
+                    write_msg(event.user_id,
+                              f"{name}\nhttps://vk.com/id{stranger_id}",
+                              searcher.find_3_photos(stranger_id),
+                              inline_keyboard.get_keyboard())
+                    session.query(User_stranger).filter(User_stranger.stranger_id == stranger_id,
+                                                        User_stranger.user_id == id).update({"status": "S"})
                     session.commit()
 
-                res = searcher.search(city=city_id, sex=1, birth_year=year)
-                strangers, user_strangers = [], []
-                for user_info in res:
-                    stranger_id = user_info['id']
-                    q = session.query(Stranger).get(stranger_id)
-                    if q:
-                        pass
-                    else:
-                        stranger = Stranger(id=stranger_id,
-                                            name=' '.join((user_info['first_name'], user_info['last_name'])),
-                                            year=year, sex=sex, city=city, city_id=city_id)
-                        # year, sex, city, city_id - не нужны в базе
-                        strangers.append(stranger)
-                        user_stranger = User_stranger(user_id=id, stranger_id=stranger_id, status='W')
-                        user_strangers.append(user_stranger)
+            elif 'like' in request:
+                stranger_id = int(request.split()[1])
+                session.query(User_stranger).filter(User_stranger.stranger_id == stranger_id,
+                                                    User_stranger.user_id == id).update({"status": "L"})
+                session.commit()
+                write_msg(event.user_id, "Добавлено в избранное")
 
-                session.add_all(strangers)
-                session.add_all(user_strangers)
+            elif 'избранное' in request:
+                q = session.query(Stranger).join(User_stranger, Stranger.id == User_stranger.stranger_id).filter(
+                    User_stranger.user_id == id,
+                    User_stranger.status == 'L'
+                ).all()
+                for el in q:
+                    name = el.name
+                    stranger_id = el.id
+                    inline_keyboard = VkKeyboard(one_time=False, inline=True)
+                    inline_keyboard.add_button(label="Delete " + str(stranger_id))
+                    write_msg(event.user_id,
+                              f"{name}\nhttps://vk.com/id{stranger_id}",
+                              searcher.find_3_photos(stranger_id),
+                              inline_keyboard.get_keyboard()
+                              )
+
+
+            elif 'delete' in request:
+
+                stranger_id = int(request.split()[1])
+
+                session.query(User_stranger).filter(User_stranger.stranger_id == stranger_id,
+
+                                                    User_stranger.user_id == id).update({"status": "S"})
+
                 session.commit()
 
-                id = event.user_id
-                q = session.query(Stranger).join(User_stranger, Stranger.id == User_stranger.stranger_id).filter(
-                    User_stranger.user_id == id,
-                    User_stranger.status == 'W'
-                ).limit(1).all()
-                for el in q:
-                    name = el.name
-                    stranger_id = el.id
-                    write_msg(event.user_id,
-                              f"{name}\nhttps://vk.com/id{stranger_id}",
-                              searcher.find_3_photos(stranger_id))
-                    write_msg(event.user_id,
-                              'Для просмотра следующей пары напиши ЕЩЕ')
-                    session.query(User_stranger).filter(User_stranger.stranger_id == stranger_id,
-                                                        User_stranger.user_id == id).update({"status": "S"})
-                    session.commit()
-            elif 'еще' in request:
-                id = event.user_id
-                q = session.query(Stranger).join(User_stranger, Stranger.id == User_stranger.stranger_id).filter(
-                    User_stranger.user_id == id,
-                    User_stranger.status == 'W'
-                ).limit(1).all()
-                for el in q:
-                    name = el.name
-                    stranger_id = el.id
-                    write_msg(event.user_id,
-                              f"{name}\nhttps://vk.com/id{stranger_id}",
-                              searcher.find_3_photos(stranger_id))
-                    write_msg(event.user_id,
-                              'Для просмотра следующей пары напиши ЕЩЕ')
-                    session.query(User_stranger).filter(User_stranger.stranger_id == stranger_id,
-                                                        User_stranger.user_id == id).update({"status": "S"})
-                    session.commit()
-
+                write_msg(event.user_id, "Удалено из избранного")
             else:
-                write_msg(event.user_id, "Не поняла вашего ответа...Для поиска напиши ПОИСК")
+                write_msg(event.user_id, "Не поняла вашего ответа...Для поиска напиши ПОИСК",
+                          keyboard=keyboard.get_keyboard())
