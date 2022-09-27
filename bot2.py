@@ -83,12 +83,11 @@ for event in longpoll.listen():
                         city = user_info['city']['title']
                         city_id = user_info['city']['id']
                         sex = user_info['sex']
-                        sex = 1 if sex == 2 else 2
                         user = User(id=id, name=name, year=year, sex=sex, city=city, city_id=city_id)
                         session.add_all([user])
                         session.commit()
-
-                    res = searcher.search(city=city_id, sex=1, birth_year=year)
+                    sex = 1 if sex == 2 else 2
+                    res = searcher.search(city=city_id, sex=sex, birth_year=year)
                     strangers, user_strangers = [], []
                     for user_info in res:
                         stranger_id = user_info['id']
