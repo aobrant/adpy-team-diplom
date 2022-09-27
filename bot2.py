@@ -38,8 +38,6 @@ def write_msg(user_id, message, attachment=None, keyboard=None):
 keyboard = VkKeyboard(one_time=True)
 keyboard.add_button('Привет', color=VkKeyboardColor.NEGATIVE)
 
-counter = 0
-
 for event in longpoll.listen():
 
     if event.type == VkEventType.MESSAGE_NEW:
@@ -55,11 +53,6 @@ for event in longpoll.listen():
                 write_msg(event.user_id, f"Привет, {get_name(event.user_id)}, меня зовут Лаура! Я - бот для знакомств, давай начнем поиск подходящей пары. Для поиска напиши ПОИСК")
             elif request == "пока":
                 write_msg(event.user_id, "Пока((")
-            #elif request.isdigit():
-                #n = int(request)
-                #write_msg(event.user_id,
-                          #f"{res[n]['first_name']} {res[n]['last_name']}\nhttps://vk.com/id{res[n]['id']}",
-                          #searcher.find_3_photos(res[n]['id']))
             elif 'поиск' in request:
                 id = event.user_id
                 q = session.query(User).get(id)
@@ -97,18 +90,28 @@ for event in longpoll.listen():
                         # year, sex, city, city_id - не нужны в базе
                         strangers.append(stranger)
                         user_stranger = User_stranger(user_id=id, stranger_id=stranger_id, status='W')
-                        # year, sex, city, city_id - не нужны в базе
                         user_strangers.append(user_stranger)
 
                 session.add_all(strangers)
                 session.add_all(user_strangers)
                 session.commit()
 
-                write_msg(event.user_id, f"{res[counter]['first_name']} {res[counter]['last_name']}\nhttps://vk.com/id{res[counter]['id']}",
-                          searcher.find_3_photos(res[counter]['id']))
-                write_msg(event.user_id,
-                          'Для просмотра следующей пары напиши ЕЩЕ')
-                counter += 1
+                id = event.user_id
+                q = session.query(Stranger).join(User_stranger, Stranger.id == User_stranger.stranger_id).filter(
+                    User_stranger.user_id == id,
+                    User_stranger.status == 'W'
+                ).limit(1).all()
+                for el in q:
+                    name = el.name
+                    stranger_id = el.id
+                    write_msg(event.user_id,
+                              f"{name}\nhttps://vk.com/id{stranger_id}",
+                              searcher.find_3_photos(stranger_id))
+                    write_msg(event.user_id,
+                              'Для просмотра следующей пары напиши ЕЩЕ')
+                    session.query(User_stranger).filter(User_stranger.stranger_id == stranger_id,
+                                                        User_stranger.user_id == id).update({"status": "S"})
+                    session.commit()
             elif 'еще' in request:
                 id = event.user_id
                 q = session.query(Stranger).join(User_stranger, Stranger.id == User_stranger.stranger_id).filter(
