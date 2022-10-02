@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 
 from bd_models import create_tables, User_stranger, User, Stranger
 
-DSN = 'postgresql://postgres:postgres@localhost:5432/netology_db'
+DSN = 'postgresql://postgres: @localhost:5432/netology_db'
 engine = sqlalchemy.create_engine(DSN)
 
 create_tables(engine)
@@ -29,7 +29,7 @@ searcher = VkApi(vk_token, user_token)
 
 vk = vk_api.VkApi(token=vk_token)
 #longpoll = VkLongPoll(vk)
-longpoll = VkBotLongPoll(vk, group_id='216157132')
+longpoll = VkBotLongPoll(vk, group_id=' ')
 
 def write_msg(user_id, message, attachment=None, keyboard=None):
 
