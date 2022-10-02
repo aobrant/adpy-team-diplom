@@ -23,6 +23,9 @@ class User(Base):
     sex = sq.Column(sq.Integer, nullable=False)
     city = sq.Column(sq.String(length=30), nullable=False)
     city_id = sq.Column(sq.Integer, nullable=False)
+    age_from = sq.Column(sq.Integer, nullable=False)
+    age_to = sq.Column(sq.Integer, nullable=False)
+    search_city = sq.Column(sq.String(length=30), nullable=False)
 
     user_stranger1 = relationship("User_stranger", back_populates="users")
 
@@ -37,11 +40,6 @@ class Stranger(Base):
 
     id = sq.Column(sq.Integer, primary_key=True)
     name = sq.Column(sq.String(length=40), nullable=False)
-    year = sq.Column(sq.Integer, nullable=False)
-    sex = sq.Column(sq.Integer, nullable=False)
-    city = sq.Column(sq.String(length=30), nullable=False)
-    city_id = sq.Column(sq.Integer, nullable=False)
-
 
     user_stranger2 = relationship("User_stranger", back_populates="strangers")
 
@@ -52,5 +50,5 @@ class Stranger(Base):
             return f'Номер ID незнакомца - {self.id}, Имя - {self.name}, год рождения - {self.year}, пол - {"мужской"}, город - {self.city}'
 
 def create_tables(engine):
-    Base.metadata.drop_all(engine)
+    # Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
