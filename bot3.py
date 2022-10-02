@@ -6,13 +6,14 @@ from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from search_class import VkApi
 from pprint import pprint
+from datetime import datetime
 
 import sqlalchemy
 from sqlalchemy.orm import sessionmaker
 
 from bd_models import create_tables, User_stranger, User, Stranger
 
-DSN = 'postgresql://postgres: @localhost:5432/netology_db'
+DSN = 'postgresql://postgres:postgres@localhost:5432/netology_db'
 engine = sqlalchemy.create_engine(DSN)
 
 create_tables(engine)
@@ -29,7 +30,9 @@ searcher = VkApi(vk_token, user_token)
 
 vk = vk_api.VkApi(token=vk_token)
 #longpoll = VkLongPoll(vk)
-longpoll = VkBotLongPoll(vk, group_id=' ')
+longpoll = VkBotLongPoll(vk, group_id='216157132')
+
+state = dict()
 
 def write_msg(user_id, message, attachment=None, keyboard=None):
 
@@ -40,9 +43,11 @@ def write_msg(user_id, message, attachment=None, keyboard=None):
 keyboard = VkKeyboard(one_time=False)
 keyboard.add_button('Поиск', color=VkKeyboardColor.POSITIVE)
 keyboard.add_button('Избранное', color=VkKeyboardColor.PRIMARY)
+keyboard.add_button('Параметры', color=VkKeyboardColor.SECONDARY)
 
 for event in longpoll.listen():
     #pprint(event)
+
     if event.type == VkBotEventType.MESSAGE_NEW:
 
         def get_name(uid: int) -> str:
@@ -51,6 +56,7 @@ for event in longpoll.listen():
 
         #id = event.user_id
         id = event.object['message']['from_id']
+        print(f'state = {state.get(id)}')
 
         if event:
             request = event.object['message']['text'].lower()
@@ -72,21 +78,31 @@ for event in longpoll.listen():
                     print('Запускаем новый поиск')
                     q2 = session.query(User).get(id)
                     if q2:
-                        name = q2.name,
-                        year = q2.year,
-                        user_sex = q2.sex,
-                        city = q2.city,
+                        name = q2.name
+                        year = q2.year
+                        user_sex = q2.sex
+                        city = q2.city
                         city_id = q2.city_id
+                        age_from = q2.age_from
+                        age_to = q2.age_to
                     else:
                         user_info = searcher.get_info_by_id(id)
                         # name = ' '.join((user_info['first_name'], user_info['last_name']))
                         name = ' '.join((user_info.get('first_name', ''), user_info.get('last_name', '')))
                         bdate = user_info['bdate']
+                        birthday = datetime.strptime(bdate, '%d.%m.%Y')
+                        age = int((datetime.now() - birthday).days / 365.2425)
+                        age_from = age
+                        age_to = age
+                        print(bdate)
+                        print(birthday)
+                        print(age)
                         year = int(bdate.split('.')[2])
                         city = user_info['city']['title']
                         city_id = user_info['city']['id']
                         user_sex = user_info['sex']
-                        user = User(id=id, name=name, year=year, sex=user_sex, city=city, city_id=city_id)
+                        user = User(id=id, name=name, year=year, sex=user_sex, city=city, city_id=city_id,
+                                    age_from=age_from, age_to=age_to, search_city=city)
                         session.add_all([user])
                         session.commit()
                     if user_sex == 2 or user_sex == (2,):
@@ -96,8 +112,8 @@ for event in longpoll.listen():
                     else:
                         print('Ошибка определения пола')
                         sex = 0
-                    print(f'user_sex = {user_sex}, sex = {sex}, citi_id = {city_id}')
-                    res = searcher.search(city=city_id, sex=sex, birth_year=year)
+                    print(f'user_sex = {user_sex}, sex = {sex}, city = {city}, age_from = {age_from}')
+                    res = searcher.search(hometown=city, sex=sex, age_from=age_from, age_to=age_to)
                     strangers, user_strangers = [], []
                     for user_info in res:
                         stranger_id = user_info['id']
@@ -106,9 +122,7 @@ for event in longpoll.listen():
                             pass
                         else:
                             stranger = Stranger(id=stranger_id,
-                                                name=' '.join((user_info['first_name'], user_info['last_name'])),
-                                                year=year, sex=sex, city=city, city_id=city_id)
-                            # year, sex, city, city_id - не нужны в базе
+                                                name=' '.join((user_info['first_name'], user_info['last_name'])))
                             strangers.append(stranger)
                             user_stranger = User_stranger(user_id=id, stranger_id=stranger_id, status='W')
                             user_strangers.append(user_stranger)
@@ -173,6 +187,76 @@ for event in longpoll.listen():
                 session.commit()
                 write_msg(id, "Удалено из избранного")
 
+            elif 'параметры' in request:
+                q2 = session.query(User).get(id)
+                if q2:
+                    name = q2.name
+                    year = q2.year
+                    user_sex = q2.sex
+                    city = q2.city
+                    city_id = q2.city_id
+                    age_from = q2.age_from
+                    age_to = q2.age_to
+                else:
+                    user_info = searcher.get_info_by_id(id)
+                    # name = ' '.join((user_info['first_name'], user_info['last_name']))
+                    name = ' '.join((user_info.get('first_name', ''), user_info.get('last_name', '')))
+                    bdate = user_info['bdate']
+                    birthday = datetime.strptime(bdate, '%d.%m.%Y')
+                    age = int((datetime.now() - birthday).days / 365.2425)
+                    age_from = age
+                    age_to = age
+                    print(bdate)
+                    print(birthday)
+                    print(age)
+                    year = int(bdate.split('.')[2])
+                    city = user_info['city']['title']
+                    city_id = user_info['city']['id']
+                    user_sex = user_info['sex']
+                    user = User(id=id, name=name, year=year, sex=user_sex, city=city, city_id=city_id,
+                                age_from=age_from, age_to=age_to, search_city=city)
+                    session.add_all([user])
+                    session.commit()
+                inline_keyboard = VkKeyboard(one_time=False, inline=True)
+                inline_keyboard.add_callback_button("Возраст от", color=VkKeyboardColor.PRIMARY,
+                                                    payload={"type": "age_from"}, )
+                inline_keyboard.add_callback_button("Возраст до", color=VkKeyboardColor.PRIMARY,
+                                                    payload={"type": "age_to"}, )
+                inline_keyboard.add_callback_button("Город", color=VkKeyboardColor.PRIMARY,
+                                                    payload={"type": "search_city"}, )
+                write_msg(id,
+                          f"Возраст от {age_from} до {age_to}\nГород: {city}",
+                          keyboard=inline_keyboard.get_keyboard()
+                          )
+                state[id] = None
+
+            elif state.get(id) == 'age_from':
+                if request.isdigit():
+                    age_from = int(request)
+                    session.query(User).filter(User.id == id).update({"age_from": age_from})
+                    session.query(User_stranger).filter(User_stranger.status == "W").delete()
+                    session.commit()
+                    write_msg(id, "OK")
+                else:
+                    write_msg(id, "Напишите желаемый максимальный возраст числом")
+
+            elif state.get(id) == 'age_to':
+                if request.isdigit():
+                    age_to = int(request)
+                    session.query(User).filter(User.id == id).update({"age_to": age_to})
+                    session.query(User_stranger).filter(User_stranger.status == "W").delete()
+                    session.commit()
+                    write_msg(id, "OK")
+                else:
+                    write_msg(id, "Напишите желаемый максимальный возраст числом")
+
+            elif state.get(id) == 'search_city':
+                search_city = request
+                session.query(User).filter(User.id == id).update({"city": search_city})
+                session.query(User_stranger).filter(User_stranger.status == "W").delete()
+                session.commit()
+                write_msg(id, "OK")
+
             else:
                 write_msg(id, "Не поняла вашего ответа...Для поиска напиши ПОИСК",
                           keyboard=keyboard.get_keyboard())
@@ -221,3 +305,15 @@ for event in longpoll.listen():
                 message='Добавлено в черный список',
                 conversation_message_id=event.obj.conversation_message_id,
             )
+
+        elif 'age_from' in event.object.payload.get("type"):
+            write_msg(id, "Напишите желаемый минимальный возраст числом")
+            state[id] = 'age_from'
+
+        elif 'age_to' in event.object.payload.get("type"):
+            write_msg(id, "Напишите желаемый максимальный возраст числом")
+            state[id] = 'age_to'
+
+        elif 'search_city' in event.object.payload.get("type"):
+            write_msg(id, "Напишите желаемый город")
+            state[id] = 'search_city'
