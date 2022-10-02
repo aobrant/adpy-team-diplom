@@ -42,7 +42,7 @@ keyboard.add_button('Поиск', color=VkKeyboardColor.POSITIVE)
 keyboard.add_button('Избранное', color=VkKeyboardColor.PRIMARY)
 
 for event in longpoll.listen():
-    pprint(event)
+    #pprint(event)
     if event.type == VkBotEventType.MESSAGE_NEW:
 
         def get_name(uid: int) -> str:
@@ -74,7 +74,7 @@ for event in longpoll.listen():
                     if q2:
                         name = q2.name,
                         year = q2.year,
-                        sex = q2.sex,
+                        user_sex = q2.sex,
                         city = q2.city,
                         city_id = q2.city_id
                     else:
@@ -85,11 +85,18 @@ for event in longpoll.listen():
                         year = int(bdate.split('.')[2])
                         city = user_info['city']['title']
                         city_id = user_info['city']['id']
-                        sex = user_info['sex']
-                        user = User(id=id, name=name, year=year, sex=sex, city=city, city_id=city_id)
+                        user_sex = user_info['sex']
+                        user = User(id=id, name=name, year=year, sex=user_sex, city=city, city_id=city_id)
                         session.add_all([user])
                         session.commit()
-                    sex = 1 if sex == 2 else 2
+                    if user_sex == 2 or user_sex == (2,):
+                        sex = 1
+                    elif user_sex == 1 or user_sex == (1,):
+                        sex = 2
+                    else:
+                        print('Ошибка определения пола')
+                        sex = 0
+                    print(f'user_sex = {user_sex}, sex = {sex}, citi_id = {city_id}')
                     res = searcher.search(city=city_id, sex=sex, birth_year=year)
                     strangers, user_strangers = [], []
                     for user_info in res:
@@ -113,6 +120,8 @@ for event in longpoll.listen():
                         User_stranger.user_id == id,
                         User_stranger.status == 'W'
                     ).limit(1).all()
+                    if not q:
+                        write_msg(id, 'Никого нового не найдено')
                 for el in q:
                     name = el.name
                     stranger_id = el.id
@@ -120,6 +129,9 @@ for event in longpoll.listen():
                     inline_keyboard.add_callback_button("Добавить в избранное",
                                                         color=VkKeyboardColor.POSITIVE,
                                                         payload={"type": "Like " + str(stranger_id)},)
+                    inline_keyboard.add_callback_button("Добавить в черный список",
+                                                        color=VkKeyboardColor.NEGATIVE,
+                                                        payload={"type": "Black " + str(stranger_id)}, )
                     write_msg(id,
                               f"{name}\nhttps://vk.com/id{stranger_id}",
                               searcher.find_3_photos(stranger_id),
@@ -197,4 +209,15 @@ for event in longpoll.listen():
                 conversation_message_id=event.obj.conversation_message_id,
                 keyboard=inline_keyboard.get_keyboard(),
                 attachment=searcher.find_3_photos(stranger_id),
+            )
+
+        elif 'Black' in event.object.payload.get("type"):
+            stranger_id = int(event.object.payload.get("type").split()[1])
+            session.query(User_stranger).filter(User_stranger.stranger_id == stranger_id,
+                                                User_stranger.user_id == id).update({"status": "B"})
+            session.commit()
+            last_id = vk.get_api().messages.edit(
+                peer_id=event.obj.peer_id,
+                message='Добавлено в черный список',
+                conversation_message_id=event.obj.conversation_message_id,
             )
