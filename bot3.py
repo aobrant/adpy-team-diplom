@@ -2,10 +2,8 @@ from random import randrange
 import configparser
 import vk_api
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
-from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from search_class import VkApi
-from pprint import pprint
 from datetime import datetime
 
 import sqlalchemy
@@ -13,7 +11,16 @@ from sqlalchemy.orm import sessionmaker
 
 from bd_models import create_tables, User_stranger, User, Stranger
 
-DSN = 'postgresql://postgres:postgres@localhost:5432/netology_db'
+config = configparser.ConfigParser()
+config.read("settings.ini")
+vk_token = config["VK"]["vk_token"]
+user_token = config["VK"]["user_token"]
+group_id = config["VK"]["group_id"]
+db_login = config['postgres']['db_login']
+db_password = config['postgres']['db_password']
+db_url = config['postgres']['db_url']
+
+DSN = f'postgresql://{db_login}:{db_password}@{db_url}'
 engine = sqlalchemy.create_engine(DSN)
 
 create_tables(engine)
@@ -21,18 +28,13 @@ create_tables(engine)
 Session = sessionmaker(bind=engine)
 session = Session()
 
-
-config = configparser.ConfigParser()
-config.read("settings.ini")
-vk_token = config["VK"]["vk_token"]
-user_token = config["VK"]["user_token"]
 searcher = VkApi(vk_token, user_token)
 
 vk = vk_api.VkApi(token=vk_token)
-#longpoll = VkLongPoll(vk)
-longpoll = VkBotLongPoll(vk, group_id='216157132')
+longpoll = VkBotLongPoll(vk, group_id=group_id)
 
 state = dict()
+
 
 def write_msg(user_id, message, attachment=None, keyboard=None):
 
@@ -46,15 +48,12 @@ keyboard.add_button('Избранное', color=VkKeyboardColor.PRIMARY)
 keyboard.add_button('Параметры', color=VkKeyboardColor.SECONDARY)
 
 for event in longpoll.listen():
-    #pprint(event)
-
     if event.type == VkBotEventType.MESSAGE_NEW:
 
         def get_name(uid: int) -> str:
             data = vk.method("users.get", {"user_ids": uid})[0]
             return f"{data['first_name']}"
 
-        #id = event.user_id
         id = event.object['message']['from_id']
         print(f'state = {state.get(id)}')
 
@@ -82,27 +81,25 @@ for event in longpoll.listen():
                         year = q2.year
                         user_sex = q2.sex
                         city = q2.city
+                        search_city = q2.search_city
                         city_id = q2.city_id
                         age_from = q2.age_from
                         age_to = q2.age_to
                     else:
                         user_info = searcher.get_info_by_id(id)
-                        # name = ' '.join((user_info['first_name'], user_info['last_name']))
                         name = ' '.join((user_info.get('first_name', ''), user_info.get('last_name', '')))
                         bdate = user_info['bdate']
                         birthday = datetime.strptime(bdate, '%d.%m.%Y')
                         age = int((datetime.now() - birthday).days / 365.2425)
                         age_from = age
                         age_to = age
-                        print(bdate)
-                        print(birthday)
-                        print(age)
                         year = int(bdate.split('.')[2])
                         city = user_info['city']['title']
+                        search_city = user_info['city']['title']
                         city_id = user_info['city']['id']
                         user_sex = user_info['sex']
                         user = User(id=id, name=name, year=year, sex=user_sex, city=city, city_id=city_id,
-                                    age_from=age_from, age_to=age_to, search_city=city)
+                                    age_from=age_from, age_to=age_to, search_city=search_city)
                         session.add_all([user])
                         session.commit()
                     if user_sex == 2 or user_sex == (2,):
@@ -112,14 +109,21 @@ for event in longpoll.listen():
                     else:
                         print('Ошибка определения пола')
                         sex = 0
-                    print(f'user_sex = {user_sex}, sex = {sex}, city = {city}, age_from = {age_from}')
-                    res = searcher.search(hometown=city, sex=sex, age_from=age_from, age_to=age_to)
+                    res = searcher.search(hometown=search_city, sex=sex, age_from=age_from, age_to=age_to)
+                    print(f'search_city = {search_city}, sex = {sex}, age_from = {age_from}, age_to = {age_to}')
+                    print(f'len(res) = {len(res)}')
                     strangers, user_strangers = [], []
                     for user_info in res:
                         stranger_id = user_info['id']
                         q = session.query(Stranger).get(stranger_id)
                         if q:
-                            pass
+                            q3 = session.query(User_stranger).filter(
+                                User_stranger.user_id == id,
+                                User_stranger.stranger_id == stranger_id
+                            ).all()
+                            if not q3:
+                                user_stranger = User_stranger(user_id=id, stranger_id=stranger_id, status='W')
+                                user_strangers.append(user_stranger)
                         else:
                             stranger = Stranger(id=stranger_id,
                                                 name=' '.join((user_info['first_name'], user_info['last_name'])))
@@ -128,6 +132,7 @@ for event in longpoll.listen():
                             user_strangers.append(user_stranger)
 
                     session.add_all(strangers)
+                    session.commit()
                     session.add_all(user_strangers)
                     session.commit()
                     q = session.query(Stranger).join(User_stranger, Stranger.id == User_stranger.stranger_id).filter(
@@ -173,12 +178,14 @@ for event in longpoll.listen():
                     inline_keyboard.add_callback_button("Убрать из избранного",
                                                         color=VkKeyboardColor.NEGATIVE,
                                                         payload={"type": "Delete " + str(stranger_id)}, )
+                    inline_keyboard.add_callback_button("Добавить в черный список",
+                                                        color=VkKeyboardColor.NEGATIVE,
+                                                        payload={"type": "Black " + str(stranger_id)}, )
                     write_msg(id,
                               f"{name}\nhttps://vk.com/id{stranger_id}",
                               searcher.find_3_photos(stranger_id),
                               inline_keyboard.get_keyboard()
                               )
-
 
             elif 'delete' in request:
                 stranger_id = int(request.split()[1])
@@ -206,9 +213,6 @@ for event in longpoll.listen():
                     age = int((datetime.now() - birthday).days / 365.2425)
                     age_from = age
                     age_to = age
-                    print(bdate)
-                    print(birthday)
-                    print(age)
                     year = int(bdate.split('.')[2])
                     city = user_info['city']['title']
                     city_id = user_info['city']['id']
@@ -251,8 +255,8 @@ for event in longpoll.listen():
                     write_msg(id, "Напишите желаемый максимальный возраст числом")
 
             elif state.get(id) == 'search_city':
-                search_city = request
-                session.query(User).filter(User.id == id).update({"city": search_city})
+                search_city = event.object['message']['text']
+                session.query(User).filter(User.id == id).update({"search_city": search_city})
                 session.query(User_stranger).filter(User_stranger.status == "W").delete()
                 session.commit()
                 write_msg(id, "OK")
@@ -267,10 +271,15 @@ for event in longpoll.listen():
             session.query(User_stranger).filter(User_stranger.stranger_id == stranger_id,
                                                 User_stranger.user_id == id).update({"status": "L"})
             session.commit()
+            q2 = session.query(Stranger).get(stranger_id)
+            name = q2.name
             inline_keyboard = VkKeyboard(one_time=False, inline=True)
             inline_keyboard.add_callback_button("Убрать из избранного",
                                                 color=VkKeyboardColor.NEGATIVE,
                                                 payload={"type": "Delete " + str(stranger_id)}, )
+            inline_keyboard.add_callback_button("Добавить в черный список",
+                                                color=VkKeyboardColor.NEGATIVE,
+                                                payload={"type": "Black " + str(stranger_id)}, )
             last_id = vk.get_api().messages.edit(
                 peer_id=event.obj.peer_id,
                 message=f"{name}\nhttps://vk.com/id{stranger_id}",
@@ -283,10 +292,15 @@ for event in longpoll.listen():
             session.query(User_stranger).filter(User_stranger.stranger_id == stranger_id,
                                                 User_stranger.user_id == id).update({"status": "S"})
             session.commit()
+            q2 = session.query(Stranger).get(stranger_id)
+            name = q2.name
             inline_keyboard = VkKeyboard(one_time=False, inline=True)
             inline_keyboard.add_callback_button("Добавить в избранное",
                                                 color=VkKeyboardColor.POSITIVE,
                                                 payload={"type": "Like " + str(stranger_id)}, )
+            inline_keyboard.add_callback_button("Добавить в черный список",
+                                                color=VkKeyboardColor.NEGATIVE,
+                                                payload={"type": "Black " + str(stranger_id)}, )
             last_id = vk.get_api().messages.edit(
                 peer_id=event.obj.peer_id,
                 message=f"{name}\nhttps://vk.com/id{stranger_id}",
@@ -307,13 +321,28 @@ for event in longpoll.listen():
             )
 
         elif 'age_from' in event.object.payload.get("type"):
-            write_msg(id, "Напишите желаемый минимальный возраст числом")
+            vk.get_api().messages.edit(
+                peer_id=event.obj.peer_id,
+                message='Напишите желаемый минимальный возраст числом',
+                conversation_message_id=event.obj.conversation_message_id,
+            )
+            #write_msg(id, "Напишите желаемый минимальный возраст числом")
             state[id] = 'age_from'
 
         elif 'age_to' in event.object.payload.get("type"):
-            write_msg(id, "Напишите желаемый максимальный возраст числом")
+            vk.get_api().messages.edit(
+                peer_id=event.obj.peer_id,
+                message='Напишите желаемый максимальный возраст числом',
+                conversation_message_id=event.obj.conversation_message_id,
+            )
+            #write_msg(id, "Напишите желаемый максимальный возраст числом")
             state[id] = 'age_to'
 
         elif 'search_city' in event.object.payload.get("type"):
-            write_msg(id, "Напишите желаемый город")
+            vk.get_api().messages.edit(
+                peer_id=event.obj.peer_id,
+                message='Напишите желаемый город',
+                conversation_message_id=event.obj.conversation_message_id,
+            )
+            #write_msg(id, "Напишите желаемый город")
             state[id] = 'search_city'
